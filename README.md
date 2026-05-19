@@ -46,7 +46,17 @@ graph TD
 
 ---
 
-## 3. Prerequisites & Environment Constraints
+## 3. Repository Structure
+
+* **`protocol.py`**: Defines the shared binary sequence format (`!I3f` encoding a sequence number, steering, gas, and brake).
+* **`carla_receiver.py`**: Event-driven client running inside the CARLA virtual environment on Linux, listening for UDP packets and applying vehicle controls.
+* **`extractor_carmaker.py`**: The extraction script deployed on Windows that queries the CarMaker APO TCP server and transmits the driver inputs over UDP to the CARLA host.
+* **`udp_stress_test.py`**: Simulates different stressful network scenarios (bursts, out-of-order delivery, latency gaps, and disconnections) to validate receiver stability.
+* **`run_test.sh`**: Shell script to run offline tests in mock mode.
+
+---
+
+## 4. Prerequisites & Environment Constraints
 
 ### Linux Host (Tested on CachyOS / Arch Linux)
 > [!IMPORTANT]
@@ -77,7 +87,7 @@ graph TD
 
 ---
 
-## 4. Configuration Steps
+## 5. Configuration Steps
 
 ### Network Setup
 1. **IP Binding & Ping Verification**:
@@ -113,9 +123,32 @@ graph TD
      * Steering Wheel Angle: `Senso.Ang` (SensoWheel physical angle) or `Qu.Steer`
      * Pedal Inputs: `Qu.Gas` / `Qu.Brake`
 
+### Script Parameter Configurations
+Before running the simulation, update the configuration blocks located at the top of the respective files:
+
+* **`extractor_carmaker.py` (Windows)**:
+  Configure your simulator-specific network and variables block:
+  ```python
+  # Dirección IP física de la máquina Linux con CARLA y puerto UDP receptor
+  LINUX_IP = "192.168.100.1"  # <-- Sustituir por la IP real de tu PC Linux
+  UDP_PORT = 9000
+
+  # Configuración del servidor de comandos de CarMaker
+  CARMAKER_HOST = "127.0.0.1"
+  CARMAKER_PORT = 16660      # <-- Puerto del APO Server (-cmdport)
+
+  # Variables UAQ a extraer
+  UAQ_STEER = "Senso.Ang"    # Mapeo del volante físico o virtual
+  UAQ_GAS   = "DM.Gas"
+  UAQ_BRAKE = "DM.Brake"
+
+  # Frecuencia de muestreo (Hz)
+  TICK_RATE = 100
+  ```
+
 ---
 
-## 5. Strict Execution Sequence
+## 6. Strict Execution Sequence
 
 To prevent **Real-time Violations** and CPU starvation, you must adhere strictly to the following execution sequence.
 
@@ -127,29 +160,42 @@ To prevent **Real-time Violations** and CPU starvation, you must adhere strictly
    ```bash
    ./CarlaUE4.sh -opengl
    ```
-2. **Step 2: Start Carla Receiver (Linux)**
+2. **Step 3: Start Carla Receiver (Linux)**
    Activate the Python 3.7 virtual environment and run the receiver. It will block and await incoming UDP telemetry:
    ```bash
    source venv_carla/bin/activate
    python carla_receiver.py
    ```
-3. **Step 3: Launch CarMaker Simulation (Windows)**
+3. **Step 4: Launch CarMaker Simulation (Windows)**
    * Load your TestRun in CarMaker.
    * Click **Start** to run the simulation.
    * **Wait exactly 3 seconds** to let the physical/virtual CAN cycle stabilize at 1000 Hz.
-4. **Step 4: Start Extractor (Windows)**
-   Run the extractor script to begin polling the APO server and forwarding packets to CARLA:
+4. **Step 5: Start Extractor (Windows)**
+   Run the extractor script to begin polling the APO server and forwarding packets:
    ```cmd
-   python extractor_carmaker.py --target-ip <LINUX_IP_ADDRESS>
+   python extractor_carmaker.py
    ```
 
 ---
 
-## 6. Troubleshooting Matrix
+## 7. Troubleshooting Matrix
 
 | Issue / Error | Root Cause | Mitigation / Solution |
 | :--- | :--- | :--- |
 | **`APO Timeout (10.0s)`** | 1. CarMaker is not running.<br>2. Zombie backend processes blocking port `16660`.<br>3. Missing `-cmdport 16660` startup argument. | 1. Ensure CarMaker is open and a TestRun is loaded.<br>2. Run `taskkill /F /IM CarMaker.win64.exe` to kill zombie instances.<br>3. Verify the command line options inside CarMaker. |
 | **`Main cycle too long`** / **`Realtime conditions violated`** | 1. Extractor executed before simulation stabilization.<br>2. APO polling rate is too high (e.g., > 200 Hz). | 1. Implement a 3-second delay after clicking Start in CarMaker before running `extractor_carmaker.py`.<br>2. Verify the polling rate in `extractor_carmaker.py` is throttled to 100 Hz. |
-| **`CARLA Vehicle Frozen`** *(No UDP traffic)* | 1. Windows Defender Firewall blocking port `9000/udp`.<br>2. Incorrect target IP argument in `extractor_carmaker.py`. | 1. Add inbound firewall rules on both hosts for `UDP port 9000`.<br>2. Verify you can ping the Linux host from the Windows host.<br>3. Verify the IP parameter passed to the extractor. |
+| **`CARLA Vehicle Frozen`** *(No UDP traffic)* | 1. Windows Defender Firewall blocking port `9000/udp`.<br>2. Incorrect `LINUX_IP` value configured in `extractor_carmaker.py`. | 1. Add inbound firewall rules on both hosts for `UDP port 9000`.<br>2. Verify you can ping the Linux host from the Windows host.<br>3. Verify the `LINUX_IP` variable inside `extractor_carmaker.py`. |
 | **`ModuleNotFoundError: No module named 'carla'`** | 1. Python virtual environment not active.<br>2. Unsupported Python version (e.g., system Python 3.11+). | 1. Run `source venv_carla/bin/activate` before starting the receiver.<br>2. Verify `python --version` outputs Python 3.7. |
+
+---
+
+## 8. Protocol Format Warning (Critical Architectural Incompatibility)
+
+> [!CAUTION]
+> There is a data layout mismatch between `extractor_carmaker.py` and `carla_receiver.py` as currently written:
+> * **`extractor_carmaker.py`** transmits data as a comma-separated plain text string: `f"{steer},{gas},{brake}"` (UTF-8 encoded).
+> * **`carla_receiver.py`** expects a structured binary package using `protocol.unpack(data)` representing `!I3f` (unsigned sequence ID followed by 3 float values).
+>
+> Running both files in their current state will cause `carla_receiver.py` to raise a `struct.error` and crash.
+>
+> **Recommended Fix**: Update `extractor_carmaker.py` to import `protocol.py` and pack the telemetry payload using `protocol.pack(seq, steer, gas, brake)` before sending.
