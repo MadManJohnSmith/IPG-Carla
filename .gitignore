@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+venv_carla/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+
+# Local runtime artifacts
+*.log
+captures/
