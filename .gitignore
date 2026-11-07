@@ -13,3 +13,10 @@ venv_carla/
 # Local runtime artifacts
 *.log
 captures/
+
+# Lab evidence (never commit)
+research/
+lab-evidence/
+*.vhdx
+*.qcow2
+*.iso

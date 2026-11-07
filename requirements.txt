@@ -1,0 +1,3 @@
+# Runtime dependency for the CARLA host only (Python 3.10).
+# The bridge itself uses the standard library.
+carla==0.9.15

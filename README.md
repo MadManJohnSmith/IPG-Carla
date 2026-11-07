@@ -1,6 +1,8 @@
 # Asynchronous SIL/HIL Simulation Bridge: IPG CarMaker ↔ CARLA Simulator
 
-This repository contains a high-performance, Software-in-the-Loop (SIL) and Hardware-in-the-Loop (HIL) asynchronous simulation bridge. It is designed to inject high-fidelity vehicle dynamics and driver control inputs from an **IPG CarMaker** instance (running on Windows) into a **CARLA Simulator** instance (running on Linux). 
+This repository contains a high-performance, Software-in-the-Loop (SIL) and Hardware-in-the-Loop (HIL) asynchronous simulation bridge. It is designed to inject high-fidelity vehicle dynamics and driver control inputs from an **IPG CarMaker** instance (running on Windows) into a **CARLA Simulator** instance (running on Linux).
+
+> New to the repository? Read [HANDOFF.md](HANDOFF.md) for current state and [docs/README.md](docs/README.md) for the documentation map. 
 
 ---
 
@@ -48,11 +50,14 @@ graph TD
 
 ## 3. Repository Structure
 
-* **`protocol.py`**: Defines the shared binary sequence format (`!I3f` encoding a sequence number, steering, gas, and brake).
-* **`carla_receiver.py`**: Event-driven client running inside the CARLA virtual environment on Linux, listening for UDP packets and applying vehicle controls.
-* **`extractor_carmaker.py`**: The extraction script deployed on Windows that queries the CarMaker APO TCP server and transmits the driver inputs over UDP to the CARLA host.
-* **`udp_stress_test.py`**: Simulates different stressful network scenarios (bursts, out-of-order delivery, latency gaps, and disconnections) to validate receiver stability.
-* **`run_test.sh`**: Shell script to run offline tests in mock mode.
+* **`bridge/protocol.py`**: Shared binary packet format (`!I3f`: sequence, steering, gas, brake).
+* **`bridge/carla_receiver.py`**: Event-driven client inside CARLA on Linux; listens for UDP and applies vehicle controls. `--test` runs without CARLA.
+* **`bridge/extractor_carmaker.py`**: Windows-side script that queries the CarMaker APO TCP server and sends driver inputs over UDP.
+* **`bridge/udp_stress_test.py`**: Stress scenarios (bursts, out-of-order delivery, latency gaps, disconnections).
+* **`bridge/run_test.sh`**: Offline mock test: receiver `--test` plus the stress test.
+* **`docs/`**: Documentation map, Mode B plan, notebook sources, extraction method, lab-evidence gate.
+* **`HANDOFF.md`**: Current state, environment plan, next steps and suggested skills.
+* **`requirements.txt`**: CARLA client pin (Python 3.10).
 
 ---
 
@@ -60,13 +65,13 @@ graph TD
 
 ### Linux Host (Tested on CachyOS / Arch Linux)
 > [!IMPORTANT]
-> CARLA 0.9.15 precompiled Python wheels only support Python 3.7 (`cp37-cp37m`). Attempting to run the bridge on modern system Python versions (e.g., Python 3.11+) will fail with a wheel incompatibility error (`is not a supported wheel on this platform`). You **must** configure a dedicated Python 3.7 environment.
+> CARLA 0.9.15 publishes Linux wheels for Python 3.7, 3.8, 3.9 and 3.10 (`cp37`-`cp310`). Use **Python 3.10** in a dedicated environment; Python 3.11+ has no 0.9.15 wheel. CARLA 0.9.16 ships `cp310`-`cp312` wheels if you prefer a newer interpreter, but this bridge is validated against 0.9.15.
 
-1. **Install Python 3.7** (using `pyenv`, system package managers, or compiling from source).
+1. **Install Python 3.10** (`uv python install 3.10`, `pyenv`, or the `python310` package).
 2. **Set up a Virtual Environment**:
    ```bash
-   # Create a virtual environment using Python 3.7
-   python3.7 -m venv venv_carla
+   # Create a virtual environment using Python 3.10
+   python3.10 -m venv venv_carla
    
    # Activate the environment
    source venv_carla/bin/activate
@@ -75,7 +80,7 @@ graph TD
    pip install --upgrade pip setuptools wheel
    ```
 3. **Install CARLA Python API Client**:
-   Ensure you install the `.whl` corresponding to CARLA 0.9.15 and Python 3.7.
+   Ensure you install the wheel corresponding to CARLA 0.9.15 and Python 3.10.
    ```bash
    pip install carla==0.9.15
    ```
