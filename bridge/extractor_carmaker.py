@@ -2,6 +2,8 @@ import socket
 import time
 import sys
 
+import protocol
+
 # ==============================================================================
 # CONFIGURACIÓN CRÍTICA DEL LABORATORIO - MODIFICA ESTO AL SENTARTE AL SIMULADOR
 # ==============================================================================
@@ -21,8 +23,13 @@ UAQ_GAS   = "DM.Gas"     # Control del piloto automático (Virtual)
 UAQ_BRAKE = "DM.Brake"   # Control del piloto automático (Virtual)
 
 # 4. Frecuencia de muestreo (Hz)
-TICK_RATE = 100 
+TICK_RATE = 100
 INTERVAL = 1.0 / TICK_RATE
+
+# 5. Normalización del volante: CarMaker entrega el ángulo en radianes (Senso.Ang),
+#    CARLA espera steer normalizado en [-1, 1]. Ajusta STEER_MAX_RAD al semirrango
+#    positivo real de tu rig físico (ej. ±160° -> 2.79 rad).
+STEER_MAX_RAD = 2.8
 # ==============================================================================
 
 def connect_to_carmaker():
@@ -78,14 +85,15 @@ def main():
     print("Presiona Ctrl+C para detener de forma segura.\n")
 
     try:
+        seq = 0
         while True:
             start_time = time.time()
-            
+
             # 1. Adquisición síncrona de datos desde el Data Dictionary
             steer = get_uaq_value(cm_sock, UAQ_STEER)
             gas = get_uaq_value(cm_sock, UAQ_GAS)
             brake = get_uaq_value(cm_sock, UAQ_BRAKE)
-            
+
             # Gestión de desconexión abrupta del backend
             if steer is None or gas is None or brake is None:
                 print("[-] Pérdida de comunicación con el puerto APO. Intentando reconexión...")
@@ -94,12 +102,15 @@ def main():
                 cm_sock = connect_to_carmaker()
                 continue
 
-            # 2. Construcción del Payload (Formato plano de texto: "steer,gas,brake")
-            # Nota: Asegúrate de comprobar en CARLA si necesitas normalizar el ángulo del SensoWheel
-            payload = f"{steer},{gas},{brake}"
-            
+            # 2. Construcción del Payload (binario !I3f vía protocol.py)
+            #    - seq monótono: el receptor descarta paquetes obsoletos con él
+            #    - steer normalizado a [-1, 1] (rango que espera CARLA.VehicleControl)
+            steer_norm = max(-1.0, min(1.0, steer / STEER_MAX_RAD))
+            payload = protocol.pack(seq, steer_norm, gas, brake)
+            seq += 1
+
             # 3. Inyección UDP a la red física hacia la máquina Linux
-            udp_sock.sendto(payload.encode('utf-8'), (LINUX_IP, UDP_PORT))
+            udp_sock.sendto(payload, (LINUX_IP, UDP_PORT))
             
             # 4. Control de frecuencia estricto para mitigar el Real-time Overrun
             elapsed = time.time() - start_time

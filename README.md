@@ -189,13 +189,16 @@ To prevent **Real-time Violations** and CPU starvation, you must adhere strictly
 
 ---
 
-## 8. Protocol Format Warning (Critical Architectural Incompatibility)
+## 8. Protocol Format (resolved)
 
-> [!CAUTION]
-> There is a data layout mismatch between `extractor_carmaker.py` and `carla_receiver.py` as currently written:
-> * **`extractor_carmaker.py`** transmits data as a comma-separated plain text string: `f"{steer},{gas},{brake}"` (UTF-8 encoded).
-> * **`carla_receiver.py`** expects a structured binary package using `protocol.unpack(data)` representing `!I3f` (unsigned sequence ID followed by 3 float values).
+> [!NOTE]
+> The original data-layout mismatch is fixed: `extractor_carmaker.py` now packs
+> the telemetry payload with `protocol.pack(seq, steer, gas, brake)` — the same
+> `!I3f` binary format (`protocol.unpack`) that `carla_receiver.py` expects.
 >
-> Running both files in their current state will cause `carla_receiver.py` to raise a `struct.error` and crash.
->
-> **Recommended Fix**: Update `extractor_carmaker.py` to import `protocol.py` and pack the telemetry payload using `protocol.pack(seq, steer, gas, brake)` before sending.
+> **Steer normalization**: CarMaker reports the wheel angle in radians
+> (`Senso.Ang`), while `CARLA.VehicleControl.steer` expects a normalized value
+> in `[-1, 1]`. The sender clamps `steer / STEER_MAX_RAD` before packing.
+> Set `STEER_MAX_RAD` in `extractor_carmaker.py` to the positive half-range of
+> your physical wheel (e.g. ±160° → 2.79 rad). Gas and brake UAQs are already
+> 0..1 and pass through unchanged.
