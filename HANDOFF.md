@@ -22,7 +22,8 @@ implemented; see `docs/mode-b.md`.
 - Lab evidence (NotebookLM sources, rig photos, Gemini chats) lives OUTSIDE this
   repo under `~/Documents/research/ipg-carla-lab/` and
   `~/Documents/research/gemini-chats/`. It is sensitive and must never be
-  committed. See `docs/lab-evidence.md`.
+  committed. A private backup is in `MadManJoohnSmith/ipg-carla-lab-evidence`
+  (ask Alan for access). See `docs/lab-evidence.md`.
 
 ## Environment
 

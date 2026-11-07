@@ -36,6 +36,8 @@ published, 4 require redaction, 6 have no identifiers) and
 
 ## If the evidence is missing
 
-If the machine was restored and `~/Documents/research/` is gone, ask Alan for
-the backup. The 7 PDFs are public papers and can be re-downloaded from their
-publishers; the notes, photos and chats cannot be regenerated.
+If the machine was restored and `~/Documents/research/` is gone, the private
+backup is <https://github.com/MadManJohnSmith/ipg-carla-lab-evidence> (ask Alan
+for access; never make it public). The 7 PDFs are public papers and can be
+re-downloaded from their publishers; the notes, photos and chats cannot be
+regenerated.
